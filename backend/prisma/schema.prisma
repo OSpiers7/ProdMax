@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  categories     Category[]
+  subcategories  Subcategory[]
+  tasks          Task[]
+  timeSessions   TimeSession[]
+  calendarEvents CalendarEvent[]
+
+  @@map("users")
+}
+
+model Category {
+  id     String @id @default(cuid())
+  name   String
+  color  String
+  userId String
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subcategories Subcategory[]
+  tasks        Task[]
+
+  @@unique([name, userId])
+  @@map("categories")
+}
+
+model Subcategory {
+  id         String @id @default(cuid())
+  name       String
+  categoryId String
+  userId     String
+
+  // Relations
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  tasks    Task[]
+
+  @@unique([name, categoryId, userId])
+  @@map("subcategories")
+}
+
+model Task {
+  id            String   @id @default(cuid())
+  title         String
+  subtasks      String?  // JSON array of subtask strings
+  categoryId    String
+  subcategoryId String?
+  userId        String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subcategory  Subcategory?   @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
+  timeSessions TimeSession[]
+  calendarEvents CalendarEvent[]
+
+  @@map("tasks")
+}
+
+model TimeSession {
+  id             String    @id @default(cuid())
+  taskId         String
+  startTime      DateTime
+  endTime        DateTime?
+  duration       Int       // in minutes
+  isActive       Boolean   @default(false)
+  isBreak        Boolean   @default(false)
+  userId         String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("time_sessions")
+}
+
+model CalendarEvent {
+  id             String    @id @default(cuid())
+  taskId         String?
+  title          String
+  start          DateTime
+  end            DateTime
+  subtasks       String?   // JSON array of subtask strings (used when taskId is null)
+  isFocusSession Boolean   @default(false)
+  userId         String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("calendar_events")
+}

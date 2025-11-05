@@ -1,0 +1,197 @@
+/* Custom styles for React Big Calendar */
+
+.calendar-container {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Calendar toolbar */
+.rbc-toolbar {
+  display: none; /* Hide default toolbar, we use custom one */
+}
+
+/* Calendar header */
+.rbc-header {
+  background-color: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  color: #374151;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 12px 8px;
+}
+
+/* Calendar cells */
+.rbc-month-view,
+.rbc-time-view {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rbc-date-cell {
+  color: #6b7280;
+  font-size: 14px;
+  padding: 8px;
+}
+
+.rbc-today {
+  background-color: #eff6ff;
+}
+
+/* Time slots - 50% of doubled height (60px) */
+.rbc-time-slot {
+  color: #6b7280;
+  font-size: 12px;
+  min-height: 60px !important;
+  height: 60px !important;
+}
+
+.rbc-timeslot-group {
+  border-bottom: 1px solid #f1f5f9;
+  min-height: 60px !important;
+  height: 60px !important;
+}
+
+/* Ensure time slot content area matches */
+.rbc-time-slot-content {
+  min-height: 60px !important;
+}
+
+/* Events */
+.rbc-event {
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border: none;
+}
+
+.rbc-event:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Event content */
+.rbc-event-content {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Selected slot */
+.rbc-slot-selection {
+  background-color: rgba(59, 130, 246, 0.1);
+  border: 1px solid #3b82f6;
+}
+
+/* Month view */
+.rbc-month-row {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.rbc-date-cell.rbc-off-range-bg {
+  background-color: #f8fafc;
+  color: #9ca3af;
+}
+
+/* Week view */
+.rbc-time-view .rbc-header {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.rbc-time-view .rbc-time-gutter {
+  background-color: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+}
+
+/* Make time labels match hour height */
+.rbc-time-view .rbc-time-header-content {
+  min-height: 60px;
+}
+
+.rbc-time-view .rbc-time-content {
+  border-top: 2px solid #e2e8f0;
+}
+
+/* Adjust time gutter labels to match hour height */
+.rbc-time-view .rbc-time-gutter .rbc-time-slot {
+  min-height: 60px !important;
+  height: 60px !important;
+  padding-top: 5px;
+}
+
+/* Ensure events have more vertical space */
+.rbc-time-view .rbc-event {
+  min-height: 40px;
+  padding: 4px 6px;
+}
+
+/* Agenda view */
+.rbc-agenda-view table {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rbc-agenda-view .rbc-agenda-date-cell {
+  background-color: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  font-weight: 600;
+}
+
+.rbc-agenda-view .rbc-agenda-time-cell {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+/* Popup */
+.rbc-popup {
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  padding: 8px;
+  z-index: 1000;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .rbc-header {
+    font-size: 12px;
+    padding: 8px 4px;
+  }
+  
+  .rbc-event {
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+  
+  .rbc-event-content {
+    font-size: 10px;
+  }
+}
+
+/* Focus session styling */
+.rbc-event.focus-session {
+  border: 2px solid #f59e0b !important;
+  box-shadow: 0 0 0 1px #f59e0b;
+}
+
+/* Category colors */
+.rbc-event.category-career {
+  background-color: #3b82f6;
+}
+
+.rbc-event.category-fitness {
+  background-color: #10b981;
+}
+
+.rbc-event.category-housekeeping {
+  background-color: #f59e0b;
+}
+
+.rbc-event.category-fun {
+  background-color: #8b5cf6;
+}
+
+.rbc-event.category-misc {
+  background-color: #6b7280;
+}
