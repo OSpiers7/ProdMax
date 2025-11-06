@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Edit, Trash2, Palette } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { Edit, Trash2 } from 'lucide-react';
 import type { CalendarEvent, Category } from '../../types';
 
 interface EventContextMenuProps {
@@ -68,9 +68,8 @@ const EventContextMenu: React.FC<EventContextMenuProps> = ({
     onClose();
   };
 
-  // Get current category color
+  // Get current category ID
   const currentCategoryId = event.task?.categoryId || event.category?.id || '';
-  const currentColor = event.task?.category?.color || event.category?.color || '#3B82F6';
 
   return (
     <div

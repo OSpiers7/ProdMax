@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Calendar, Clock, Target, Plus } from 'lucide-react';
 import type { CalendarEvent, Category } from '../../types';
 
@@ -41,8 +41,6 @@ const TaskForm: React.FC<TaskFormProps> = ({
   });
 
   const [subtasks, setSubtasks] = useState<string[]>(['']);
-
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [subcategories, setSubcategories] = useState<any[]>([]);
 
   // Initialize form data
@@ -93,11 +91,9 @@ const TaskForm: React.FC<TaskFormProps> = ({
     if (formData.categoryId) {
       const category = categories.find(cat => cat.id === formData.categoryId);
       if (category) {
-        setSelectedCategory(category);
         setSubcategories(category.subcategories || []);
       }
     } else {
-      setSelectedCategory(null);
       setSubcategories([]);
     }
   }, [formData.categoryId, categories]);

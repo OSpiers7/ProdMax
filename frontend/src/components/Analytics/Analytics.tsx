@@ -1,4 +1,3 @@
-import React from 'react';
 import { useQuery } from 'react-query';
 import {
   Chart as ChartJS,
@@ -74,7 +73,7 @@ const Analytics: React.FC = () => {
         datasets: [
           {
             label: 'Hours Spent',
-            data: Object.values(thisWeekData.byCategory).map((hours: number) =>
+            data: (Object.values(thisWeekData.byCategory) as number[]).map((hours) =>
               Math.round(hours * 10) / 10
             ),
             backgroundColor: [
@@ -104,7 +103,7 @@ const Analytics: React.FC = () => {
         datasets: [
           {
             label: 'Hours Spent',
-            data: Object.values(thisWeekData.careerSubcategories).map((hours: number) =>
+            data: (Object.values(thisWeekData.careerSubcategories) as number[]).map((hours) =>
               Math.round(hours * 10) / 10
             ),
             backgroundColor: [

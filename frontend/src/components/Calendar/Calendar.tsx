@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Calendar as BigCalendar, momentLocalizer, Views } from 'react-big-calendar';
+import type { View } from 'react-big-calendar';
 import moment from 'moment';
 import { Plus, Play } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
@@ -7,7 +8,7 @@ import api from '../../services/api';
 import TaskForm from './TaskForm';
 import FocusTimer from '../FocusTimer/FocusTimer';
 import EventContextMenu from './EventContextMenu';
-import type { CalendarEvent, Task, Category } from '../../types';
+import type { CalendarEvent, Category } from '../../types';
 
 // Setup moment localizer for React Big Calendar
 const localizer = momentLocalizer(moment);
@@ -17,7 +18,7 @@ import 'react-big-calendar/lib/css/react-big-calendar.css';
 import './Calendar.css';
 
 const Calendar: React.FC = () => {
-  const [view, setView] = useState(Views.WEEK);
+  const [view, setView] = useState<View>(Views.WEEK);
   const [date, setDate] = useState(new Date());
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null);
@@ -61,8 +62,8 @@ const Calendar: React.FC = () => {
     }
   );
 
-  // Fetch tasks for dropdown
-  const { data: tasks = [], error: tasksError } = useQuery<Task[]>(
+  // Fetch tasks for error handling
+  const { error: tasksError } = useQuery(
     'tasks',
     async () => {
       const response = await api.get('/tasks');
