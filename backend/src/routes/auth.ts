@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { createError } from '../middleware/errorHandler';
@@ -84,10 +84,11 @@ router.post('/register', async (req, res, next) => {
     // Generate JWT token
     const secret = process.env.JWT_SECRET || 'default-secret';
     const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
+    const options = { expiresIn } as SignOptions;
     const token = jwt.sign(
       { userId: user.id },
-      secret as string,
-      { expiresIn: expiresIn as string }
+      secret,
+      options
     );
 
     return res.status(201).json({
@@ -131,8 +132,8 @@ router.post('/login', async (req, res, next) => {
     const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
     const token = jwt.sign(
       { userId: user.id },
-      secret as string,
-      { expiresIn: expiresIn as string }
+      secret,
+      { expiresIn } as SignOptions
     );
 
     return res.json({
