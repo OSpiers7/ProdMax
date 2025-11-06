@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Play, Pause, Square, Target, Clock, Tag, Layers } from 'lucide-react';
 import type { CalendarEvent } from '../../types';
 
@@ -14,7 +14,7 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ isOpen, onClose, event }) => {
   const [timeRemaining, setTimeRemaining] = useState(FOCUS_DURATION);
   const [isRunning, setIsRunning] = useState(false);
   const [startTime, setStartTime] = useState<Date | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<number | null>(null);
   
   // Get subtasks from event or task
   const subtasks = event.subtasks || event.task?.subtasks || [];
