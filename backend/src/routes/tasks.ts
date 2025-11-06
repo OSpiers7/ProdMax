@@ -39,12 +39,12 @@ router.get('/', async (req: any, res, next) => {
       subtasks: task.subtasks ? JSON.parse(task.subtasks) : []
     }));
 
-    res.json({
+    return res.json({
       success: true,
       data: tasksWithParsedSubtasks
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -75,12 +75,12 @@ router.get('/:id', async (req: any, res, next) => {
       subtasks: task.subtasks ? JSON.parse(task.subtasks) : []
     };
 
-    res.json({
+    return res.json({
       success: true,
       data: taskResponse
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -138,12 +138,12 @@ router.post('/', async (req: any, res, next) => {
       subtasks: task.subtasks ? JSON.parse(task.subtasks) : []
     };
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: taskResponse
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -215,12 +215,12 @@ router.put('/:id', async (req: any, res, next) => {
       subtasks: task.subtasks ? JSON.parse(task.subtasks) : []
     };
 
-    res.json({
+    return res.json({
       success: true,
       data: taskResponse
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -242,12 +242,12 @@ router.delete('/:id', async (req: any, res, next) => {
       where: { id: req.params.id }
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Task deleted successfully'
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -262,12 +262,12 @@ router.get('/categories/all', async (req: any, res, next) => {
       orderBy: { name: 'asc' }
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: categories
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

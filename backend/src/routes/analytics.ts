@@ -76,10 +76,13 @@ router.get('/:period', async (req: any, res, next) => {
 
     timeSessions.forEach(session => {
       const categoryName = session.task.category.name;
-      const subcategoryName = session.task.subcategory.name;
       
       byCategory[categoryName] = (byCategory[categoryName] || 0) + session.duration;
-      bySubcategory[subcategoryName] = (bySubcategory[subcategoryName] || 0) + session.duration;
+      
+      if (session.task.subcategory) {
+        const subcategoryName = session.task.subcategory.name;
+        bySubcategory[subcategoryName] = (bySubcategory[subcategoryName] || 0) + session.duration;
+      }
     });
 
     // Calculate productivity score (0-100)
@@ -97,12 +100,12 @@ router.get('/:period', async (req: any, res, next) => {
       sessions: timeSessions.length
     };
 
-    res.json({
+    return res.json({
       success: true,
       data: analytics
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -173,12 +176,12 @@ router.get('/trends/:period', async (req: any, res, next) => {
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: trends.reverse() // Most recent first
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -282,12 +285,12 @@ router.get('/categories/:period', async (req: any, res, next) => {
       };
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: categoryBreakdown
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -350,7 +353,7 @@ router.get('/calendar/this-week', async (req: any, res, next) => {
       }
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         byCategory,
@@ -358,7 +361,7 @@ router.get('/calendar/this-week', async (req: any, res, next) => {
       }
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -435,12 +438,12 @@ router.get('/calendar/trends/:category', async (req: any, res, next) => {
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: trends.reverse() // Most recent first
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

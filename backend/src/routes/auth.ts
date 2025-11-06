@@ -82,13 +82,15 @@ router.post('/register', async (req, res, next) => {
     }
 
     // Generate JWT token
+    const secret = process.env.JWT_SECRET || 'default-secret';
+    const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
     const token = jwt.sign(
       { userId: user.id },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      secret as string,
+      { expiresIn: expiresIn as string }
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: {
         user: {
@@ -100,7 +102,7 @@ router.post('/register', async (req, res, next) => {
       }
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -125,13 +127,15 @@ router.post('/login', async (req, res, next) => {
     // For now, we'll skip password verification for simplicity
 
     // Generate JWT token
+    const secret = process.env.JWT_SECRET || 'default-secret';
+    const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
     const token = jwt.sign(
       { userId: user.id },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      secret as string,
+      { expiresIn: expiresIn as string }
     );
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         user: {
@@ -143,7 +147,7 @@ router.post('/login', async (req, res, next) => {
       }
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -157,7 +161,8 @@ router.get('/profile', async (req, res, next) => {
       return res.status(401).json({ error: 'Access token required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+    const secret = process.env.JWT_SECRET || 'default-secret';
+    const decoded = jwt.verify(token, secret) as { userId: string };
     
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -168,12 +173,12 @@ router.get('/profile', async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid token' });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: { user }
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

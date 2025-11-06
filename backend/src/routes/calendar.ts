@@ -62,12 +62,12 @@ router.get('/events', async (req: any, res, next) => {
       subtasks: event.subtasks ? JSON.parse(event.subtasks) : []
     }));
 
-    res.json({
+    return res.json({
       success: true,
       data: eventsWithParsedSubtasks
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -102,12 +102,12 @@ router.get('/events/:date', async (req: any, res, next) => {
       orderBy: { start: 'asc' }
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: events
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -186,12 +186,12 @@ router.post('/events', async (req: any, res, next) => {
 
     console.log('Calendar event created successfully:', eventResponse);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: eventResponse
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -251,12 +251,12 @@ router.put('/events/:id', async (req: any, res, next) => {
       subtasks: event.subtasks ? JSON.parse(event.subtasks) : []
     };
 
-    res.json({
+    return res.json({
       success: true,
       data: eventResponse
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -278,12 +278,12 @@ router.delete('/events/:id', async (req: any, res, next) => {
       where: { id: req.params.id }
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Event deleted successfully'
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -325,7 +325,7 @@ router.get('/week/:date', async (req: any, res, next) => {
       orderBy: { start: 'asc' }
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         startOfWeek,
@@ -334,7 +334,7 @@ router.get('/week/:date', async (req: any, res, next) => {
       }
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

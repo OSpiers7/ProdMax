@@ -65,12 +65,12 @@ router.post('/start', async (req: any, res, next) => {
       }
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: timerSession
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -108,12 +108,12 @@ router.put('/pause/:id', async (req: any, res, next) => {
       }
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: updatedSession
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -154,12 +154,12 @@ router.put('/stop/:id', async (req: any, res, next) => {
       }
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: updatedSession
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -181,12 +181,12 @@ router.get('/active', async (req: any, res, next) => {
       }
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: activeTimer
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -210,12 +210,12 @@ router.get('/history', async (req: any, res, next) => {
       skip: parseInt(offset as string)
     });
 
-    res.json({
+    return res.json({
       success: true,
       data: timerSessions
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -260,12 +260,12 @@ router.post('/break/:id', async (req: any, res, next) => {
       }
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: breakSession
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
