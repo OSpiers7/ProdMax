@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { createError } from '../middleware/errorHandler';
+import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -22,10 +23,10 @@ const updateTaskSchema = z.object({
 });
 
 // Get all tasks for user
-router.get('/', async (req: any, res, next) => {
+router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const tasks = await prisma.task.findMany({
-      where: { userId: req.user.id },
+      where: { userId: req.user!.id },
       include: {
         category: true,
         subcategory: true
@@ -34,7 +35,7 @@ router.get('/', async (req: any, res, next) => {
     });
 
     // Parse subtasks JSON to array for each task
-    const tasksWithParsedSubtasks = tasks.map(task => ({
+    const tasksWithParsedSubtasks = tasks.map((task) => ({
       ...task,
       subtasks: task.subtasks ? JSON.parse(task.subtasks) : []
     }));
@@ -49,12 +50,18 @@ router.get('/', async (req: any, res, next) => {
 });
 
 // Get single task
-router.get('/:id', async (req: any, res, next) => {
+router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    if (!req.params.id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Task ID is required'
+      });
+    }
     const task = await prisma.task.findFirst({
       where: {
         id: req.params.id,
-        userId: req.user.id
+        userId: req.user!.id
       },
       include: {
         category: true,
@@ -85,13 +92,13 @@ router.get('/:id', async (req: any, res, next) => {
 });
 
 // Create new task
-router.post('/', async (req: any, res, next) => {
+router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { title, subtasks, categoryId, subcategoryId } = createTaskSchema.parse(req.body);
 
     // Verify category belongs to user
     const category = await prisma.category.findFirst({
-      where: { id: categoryId, userId: req.user.id }
+      where: { id: categoryId, userId: req.user!.id }
     });
 
     if (!category) {
@@ -104,7 +111,7 @@ router.post('/', async (req: any, res, next) => {
     // Verify subcategory if provided
     if (subcategoryId) {
       const subcategory = await prisma.subcategory.findFirst({
-        where: { id: subcategoryId, userId: req.user.id, categoryId }
+        where: { id: subcategoryId, userId: req.user!.id, categoryId }
       });
 
       if (!subcategory) {
@@ -124,7 +131,7 @@ router.post('/', async (req: any, res, next) => {
         subtasks: subtasksJson,
         categoryId,
         subcategoryId: subcategoryId || null,
-        userId: req.user.id
+        userId: req.user!.id
       },
       include: {
         category: true,
@@ -148,13 +155,19 @@ router.post('/', async (req: any, res, next) => {
 });
 
 // Update task
-router.put('/:id', async (req: any, res, next) => {
+router.put('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { title, subtasks, categoryId, subcategoryId } = updateTaskSchema.parse(req.body);
 
+    if (!req.params.id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Task ID is required'
+      });
+    }
     // Check if task exists and belongs to user
     const existingTask = await prisma.task.findFirst({
-      where: { id: req.params.id, userId: req.user.id }
+      where: { id: req.params.id, userId: req.user!.id }
     });
 
     if (!existingTask) {
@@ -167,7 +180,7 @@ router.put('/:id', async (req: any, res, next) => {
     // Verify new category and subcategory if provided
     if (categoryId) {
       const category = await prisma.category.findFirst({
-        where: { id: categoryId, userId: req.user.id }
+        where: { id: categoryId, userId: req.user!.id }
       });
 
       if (!category) {
@@ -180,7 +193,7 @@ router.put('/:id', async (req: any, res, next) => {
 
     if (subcategoryId) {
       const subcategory = await prisma.subcategory.findFirst({
-        where: { id: subcategoryId, userId: req.user.id, categoryId: categoryId || existingTask.categoryId }
+        where: { id: subcategoryId, userId: req.user!.id, categoryId: categoryId || existingTask.categoryId }
       });
 
       if (!subcategory) {
@@ -192,7 +205,12 @@ router.put('/:id', async (req: any, res, next) => {
     }
 
     // Convert subtasks array to JSON string if provided
-    const updateData: any = {};
+    const updateData: {
+      title?: string;
+      subtasks?: string | null;
+      categoryId?: string;
+      subcategoryId?: string | null;
+    } = {};
     if (title) updateData.title = title;
     if (subtasks !== undefined) {
       updateData.subtasks = subtasks && subtasks.length > 0 ? JSON.stringify(subtasks) : null;
@@ -225,10 +243,16 @@ router.put('/:id', async (req: any, res, next) => {
 });
 
 // Delete task
-router.delete('/:id', async (req: any, res, next) => {
+router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    if (!req.params.id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Task ID is required'
+      });
+    }
     const task = await prisma.task.findFirst({
-      where: { id: req.params.id, userId: req.user.id }
+      where: { id: req.params.id, userId: req.user!.id }
     });
 
     if (!task) {
@@ -252,10 +276,10 @@ router.delete('/:id', async (req: any, res, next) => {
 });
 
 // Get categories and subcategories
-router.get('/categories/all', async (req: any, res, next) => {
+router.get('/categories/all', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const categories = await prisma.category.findMany({
-      where: { userId: req.user.id },
+      where: { userId: req.user!.id },
       include: {
         subcategories: true
       },

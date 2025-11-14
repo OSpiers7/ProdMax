@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { createError } from '../middleware/errorHandler';
+import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -24,7 +25,7 @@ const updateEventSchema = z.object({
 });
 
 // Get calendar events for a date range
-router.get('/events', async (req: any, res, next) => {
+router.get('/events', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { start, end } = req.query;
 
@@ -37,7 +38,7 @@ router.get('/events', async (req: any, res, next) => {
 
     const events = await prisma.calendarEvent.findMany({
       where: {
-        userId: req.user.id,
+        userId: req.user!.id,
         start: {
           gte: new Date(start as string)
         },
@@ -57,7 +58,7 @@ router.get('/events', async (req: any, res, next) => {
     });
 
     // Parse subtasks JSON to array for each event
-    const eventsWithParsedSubtasks = events.map(event => ({
+    const eventsWithParsedSubtasks = events.map((event) => ({
       ...event,
       subtasks: event.subtasks ? JSON.parse(event.subtasks) : []
     }));
@@ -72,8 +73,14 @@ router.get('/events', async (req: any, res, next) => {
 });
 
 // Get calendar events for a specific date
-router.get('/events/:date', async (req: any, res, next) => {
+router.get('/events/:date', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    if (!req.params.date) {
+      return res.status(400).json({
+        success: false,
+        error: 'Date parameter is required'
+      });
+    }
     const date = new Date(req.params.date);
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
@@ -83,7 +90,7 @@ router.get('/events/:date', async (req: any, res, next) => {
 
     const events = await prisma.calendarEvent.findMany({
       where: {
-        userId: req.user.id,
+        userId: req.user!.id,
         start: {
           gte: startOfDay
         },
@@ -112,7 +119,7 @@ router.get('/events/:date', async (req: any, res, next) => {
 });
 
 // Create calendar event
-router.post('/events', async (req: any, res, next) => {
+router.post('/events', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     console.log('Received calendar event request:', req.body);
     console.log('User ID:', req.user?.id);
@@ -126,7 +133,7 @@ router.post('/events', async (req: any, res, next) => {
     // If taskId is provided, verify task exists and belongs to user
     if (taskId) {
       task = await prisma.task.findFirst({
-        where: { id: taskId, userId: req.user.id },
+        where: { id: taskId, userId: req.user!.id },
         include: { category: true, subcategory: true }
       });
 
@@ -155,7 +162,7 @@ router.post('/events', async (req: any, res, next) => {
       end: new Date(end),
       subtasks: subtasksJson,
       isFocusSession,
-      userId: req.user.id
+      userId: req.user!.id
     });
 
     const event = await prisma.calendarEvent.create({
@@ -166,7 +173,7 @@ router.post('/events', async (req: any, res, next) => {
         end: new Date(end),
         subtasks: subtasksJson,
         isFocusSession,
-        userId: req.user.id
+        userId: req.user!.id
       },
       include: {
         task: task ? {
@@ -196,13 +203,19 @@ router.post('/events', async (req: any, res, next) => {
 });
 
 // Update calendar event
-router.put('/events/:id', async (req: any, res, next) => {
+router.put('/events/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { start, end, isFocusSession, taskId } = updateEventSchema.parse(req.body);
 
+    if (!req.params.id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Event ID is required'
+      });
+    }
     // Check if event exists and belongs to user
     const existingEvent = await prisma.calendarEvent.findFirst({
-      where: { id: req.params.id, userId: req.user.id }
+      where: { id: req.params.id, userId: req.user!.id }
     });
 
     if (!existingEvent) {
@@ -216,7 +229,7 @@ router.put('/events/:id', async (req: any, res, next) => {
     if (taskId !== undefined) {
       if (taskId) {
         const task = await prisma.task.findFirst({
-          where: { id: taskId, userId: req.user.id }
+          where: { id: taskId, userId: req.user!.id }
         });
         if (!task) {
           return res.status(404).json({
@@ -261,10 +274,16 @@ router.put('/events/:id', async (req: any, res, next) => {
 });
 
 // Delete calendar event
-router.delete('/events/:id', async (req: any, res, next) => {
+router.delete('/events/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    if (!req.params.id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Event ID is required'
+      });
+    }
     const event = await prisma.calendarEvent.findFirst({
-      where: { id: req.params.id, userId: req.user.id }
+      where: { id: req.params.id, userId: req.user!.id }
     });
 
     if (!event) {
@@ -288,8 +307,14 @@ router.delete('/events/:id', async (req: any, res, next) => {
 });
 
 // Get weekly view data
-router.get('/week/:date', async (req: any, res, next) => {
+router.get('/week/:date', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    if (!req.params.date) {
+      return res.status(400).json({
+        success: false,
+        error: 'Date parameter is required'
+      });
+    }
     const date = new Date(req.params.date);
     
     // Get start of week (Monday)
@@ -306,7 +331,7 @@ router.get('/week/:date', async (req: any, res, next) => {
 
     const events = await prisma.calendarEvent.findMany({
       where: {
-        userId: req.user.id,
+        userId: req.user!.id,
         start: {
           gte: startOfWeek
         },

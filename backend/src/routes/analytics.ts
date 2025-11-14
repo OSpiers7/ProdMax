@@ -1,12 +1,13 @@
-import { Router } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { createError } from '../middleware/errorHandler';
+import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
 
 // Get analytics for a specific period
-router.get('/:period', async (req: any, res, next) => {
+router.get('/:period', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { period } = req.params;
     const { startDate, endDate } = req.query;
@@ -49,7 +50,7 @@ router.get('/:period', async (req: any, res, next) => {
     // Get time sessions for the period
     const timeSessions = await prisma.timeSession.findMany({
       where: {
-        userId: req.user.id,
+        userId: req.user!.id,
         startTime: {
           gte: start,
           lte: end
@@ -67,14 +68,14 @@ router.get('/:period', async (req: any, res, next) => {
     });
 
     // Calculate analytics
-    const totalTime = timeSessions.reduce((sum, session) => sum + session.duration, 0);
-    const focusSessions = timeSessions.filter(session => !session.isBreak).length;
+    const totalTime = timeSessions.reduce((sum: number, session) => sum + session.duration, 0);
+    const focusSessions = timeSessions.filter((session) => !session.isBreak).length;
 
     // Group by category
     const byCategory: Record<string, number> = {};
     const bySubcategory: Record<string, number> = {};
 
-    timeSessions.forEach(session => {
+    timeSessions.forEach((session) => {
       const categoryName = session.task.category.name;
       
       byCategory[categoryName] = (byCategory[categoryName] || 0) + session.duration;
@@ -110,7 +111,7 @@ router.get('/:period', async (req: any, res, next) => {
 });
 
 // Get productivity trends
-router.get('/trends/:period', async (req: any, res, next) => {
+router.get('/trends/:period', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { period } = req.params;
     const { weeks = 12 } = req.query;
@@ -147,7 +148,7 @@ router.get('/trends/:period', async (req: any, res, next) => {
 
       const timeSessions = await prisma.timeSession.findMany({
         where: {
-          userId: req.user.id,
+          userId: req.user!.id,
           startTime: { gte: start, lte: end },
           isActive: false
         },
@@ -161,8 +162,8 @@ router.get('/trends/:period', async (req: any, res, next) => {
         }
       });
 
-      const totalTime = timeSessions.reduce((sum, session) => sum + session.duration, 0);
-      const focusSessions = timeSessions.filter(session => !session.isBreak).length;
+      const totalTime = timeSessions.reduce((sum: number, session) => sum + session.duration, 0);
+      const focusSessions = timeSessions.filter((session) => !session.isBreak).length;
       const productivityScore = calculateProductivityScore(timeSessions, totalTime);
 
       trends.push({
@@ -186,7 +187,7 @@ router.get('/trends/:period', async (req: any, res, next) => {
 });
 
 // Get category breakdown
-router.get('/categories/:period', async (req: any, res, next) => {
+router.get('/categories/:period', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { period } = req.params;
     const { startDate, endDate } = req.query;
@@ -228,7 +229,7 @@ router.get('/categories/:period', async (req: any, res, next) => {
 
     const timeSessions = await prisma.timeSession.findMany({
       where: {
-        userId: req.user.id,
+        userId: req.user!.id,
         startTime: { gte: start, lte: end },
         isActive: false
       },
@@ -244,7 +245,7 @@ router.get('/categories/:period', async (req: any, res, next) => {
 
     // Get all categories for the user
     const categories = await prisma.category.findMany({
-      where: { userId: req.user.id },
+      where: { userId: req.user!.id },
       include: { subcategories: true }
     });
 
@@ -295,7 +296,7 @@ router.get('/categories/:period', async (req: any, res, next) => {
 });
 
 // Get calendar-based analytics for this week
-router.get('/calendar/this-week', async (req: any, res, next) => {
+router.get('/calendar/this-week', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const now = new Date();
     const start = new Date(now);
@@ -308,7 +309,7 @@ router.get('/calendar/this-week', async (req: any, res, next) => {
     // Get calendar events for this week
     const events = await prisma.calendarEvent.findMany({
       where: {
-        userId: req.user.id,
+        userId: req.user!.id,
         start: {
           gte: start,
           lte: end
@@ -337,7 +338,7 @@ router.get('/calendar/this-week', async (req: any, res, next) => {
     // Group by career advancement subcategories
     const careerSubcategories: Record<string, number> = {};
 
-    events.forEach(event => {
+    events.forEach((event) => {
       if (event.task && event.task.category) {
         const categoryName = event.task.category.name;
         const durationHours = calculateHours(event.start, event.end);
@@ -366,12 +367,18 @@ router.get('/calendar/this-week', async (req: any, res, next) => {
 });
 
 // Get weekly trends for a specific category
-router.get('/calendar/trends/:category', async (req: any, res, next) => {
+router.get('/calendar/trends/:category', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     // Decode the category name from URL
+    if (!req.params.category) {
+      return res.status(400).json({
+        success: false,
+        error: 'Category parameter is required'
+      });
+    }
     const category = decodeURIComponent(req.params.category);
     const { weeks = 12 } = req.query;
-    const numWeeks = parseInt(weeks as string);
+    const numWeeks = parseInt((weeks as string) || '12');
 
     const trends = [];
     const now = new Date();
@@ -379,7 +386,7 @@ router.get('/calendar/trends/:category', async (req: any, res, next) => {
     // Find the category by name for the user
     const categoryRecord = await prisma.category.findFirst({
       where: {
-        userId: req.user.id,
+        userId: req.user!.id,
         name: category
       }
     });
@@ -402,7 +409,7 @@ router.get('/calendar/trends/:category', async (req: any, res, next) => {
       // Get events for this week that belong to the category
       const events = await prisma.calendarEvent.findMany({
         where: {
-          userId: req.user.id,
+          userId: req.user!.id,
           start: {
             gte: weekStart,
             lte: weekEnd
@@ -421,7 +428,7 @@ router.get('/calendar/trends/:category', async (req: any, res, next) => {
       });
 
       // Calculate total hours for this week
-      const totalHours = events.reduce((sum, event) => {
+      const totalHours = events.reduce((sum: number, event) => {
         const diffMs = event.end.getTime() - event.start.getTime();
         return sum + (diffMs / (1000 * 60 * 60));
       }, 0);
@@ -447,10 +454,10 @@ router.get('/calendar/trends/:category', async (req: any, res, next) => {
   }
 });
 
-function calculateProductivityScore(sessions: any[], totalTime: number): number {
+function calculateProductivityScore(sessions: Array<{ duration: number; isBreak: boolean }>, totalTime: number): number {
   if (sessions.length === 0) return 0;
 
-  const focusSessions = sessions.filter(session => !session.isBreak);
+  const focusSessions = sessions.filter((session) => !session.isBreak);
   const avgSessionLength = totalTime / sessions.length;
   const focusRatio = focusSessions.length / sessions.length;
   

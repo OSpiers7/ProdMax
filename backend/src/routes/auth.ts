@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
@@ -21,7 +21,7 @@ const loginSchema = z.object({
 });
 
 // Register
-router.post('/register', async (req, res, next) => {
+router.post('/register', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, name, password } = registerSchema.parse(req.body);
 
@@ -108,7 +108,7 @@ router.post('/register', async (req, res, next) => {
 });
 
 // Login
-router.post('/login', async (req, res, next) => {
+router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
 
@@ -153,7 +153,7 @@ router.post('/login', async (req, res, next) => {
 });
 
 // Get user profile
-router.get('/profile', async (req, res, next) => {
+router.get('/profile', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1];
