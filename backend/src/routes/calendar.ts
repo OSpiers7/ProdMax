@@ -46,24 +46,36 @@ router.get('/events', async (req: AuthRequest, res: Response, next: NextFunction
     const endDate = new Date(end as string);
 
     // Get all events (including parent recurring events and instances)
+    // We need to find:
+    // 1. Regular events that fall within the date range
+    // 2. Parent recurring events that could generate instances in this range
     const events = await prisma.calendarEvent.findMany({
       where: {
         userId: req.user!.id,
         OR: [
-          // Events that start within the range
+          // Regular events (non-recurring) that start within the range
           {
-            start: {
-              gte: startDate,
-              lte: endDate
-            }
+            AND: [
+              { recurrenceRule: null },
+              { start: { gte: startDate } },
+              { start: { lte: endDate } }
+            ]
           },
-          // Parent recurring events that might generate instances in this range
+          // Parent recurring events (not instances) that could generate instances in range
           {
-            recurrenceRule: { not: null },
-            start: { lte: endDate },
-            OR: [
-              { recurrenceEndDate: null },
-              { recurrenceEndDate: { gte: startDate } }
+            AND: [
+              { recurrenceRule: { not: null } },
+              { parentEventId: null },
+              { isRecurringInstance: false },
+              // Parent event starts before or during the range
+              { start: { lte: endDate } },
+              // And either has no end date, or end date is after range start
+              {
+                OR: [
+                  { recurrenceEndDate: null },
+                  { recurrenceEndDate: { gte: startDate } }
+                ]
+              }
             ]
           }
         ]
@@ -91,7 +103,17 @@ router.get('/events', async (req: AuthRequest, res: Response, next: NextFunction
           // Set end date if provided
           if (event.recurrenceEndDate) {
             recurrenceRule.endDate = new Date(event.recurrenceEndDate);
+          } else {
+            // Default to 1 year from now if no end date
+            recurrenceRule.endDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
           }
+          
+          console.log(`Generating instances for recurring event ${event.id}:`, {
+            rule: event.recurrenceRule,
+            start: event.start,
+            endDate: recurrenceRule.endDate,
+            queryRange: { start: startDate, end: endDate }
+          });
           
           const instances = generateRecurringEventDates(
             new Date(event.start),
@@ -100,10 +122,15 @@ router.get('/events', async (req: AuthRequest, res: Response, next: NextFunction
             200 // Max instances
           );
 
+          console.log(`Generated ${instances.length} total instances`);
+
           // Filter instances that fall within the requested date range
           const validInstances = instances.filter(instance => {
-            return instance.start >= startDate && instance.start <= endDate;
+            const instanceStart = new Date(instance.start);
+            return instanceStart >= startDate && instanceStart <= endDate;
           });
+
+          console.log(`Filtered to ${validInstances.length} instances in date range`);
 
           // Create event objects for each instance
           for (const instance of validInstances) {
@@ -117,14 +144,17 @@ router.get('/events', async (req: AuthRequest, res: Response, next: NextFunction
               subtasks: event.subtasks ? JSON.parse(event.subtasks) : []
             });
           }
+        } else {
+          console.warn(`Failed to parse recurrence rule: ${event.recurrenceRule}`);
         }
       } else if (!event.isRecurringInstance) {
-        // Regular event or already an instance
+        // Regular event (not recurring, not an instance)
         allEvents.push({
           ...event,
           subtasks: event.subtasks ? JSON.parse(event.subtasks) : []
         });
       }
+      // Skip if it's already a recurring instance (shouldn't happen with current query)
     }
 
     // Remove duplicates and sort
