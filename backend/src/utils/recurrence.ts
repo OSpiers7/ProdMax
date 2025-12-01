@@ -123,7 +123,7 @@ export function generateRecurringInstances(
             // Next day in the rule (same week)
             const nextDayName = recurrenceRule.byDay[currentDayInRule + 1];
             if (nextDayName) {
-              const nextDayIndex = dayNames.indexOf(nextDayName);
+              const nextDayIndex = dayNames.indexOf(nextDayName as 'SU' | 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA');
               let daysUntilNext = nextDayIndex - currentDayIndex;
               if (daysUntilNext <= 0) {
                 daysUntilNext += 7; // Wrap to next week
@@ -134,7 +134,7 @@ export function generateRecurringInstances(
             // Last day in rule, move to first day of next week
             const firstDayName = recurrenceRule.byDay[0];
             if (firstDayName) {
-              const firstDayIndex = dayNames.indexOf(firstDayName);
+              const firstDayIndex = dayNames.indexOf(firstDayName as 'SU' | 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA');
               let daysUntilNext = (firstDayIndex - currentDayIndex + 7) % 7;
               if (daysUntilNext === 0) {
                 daysUntilNext = 7; // Move to next week
