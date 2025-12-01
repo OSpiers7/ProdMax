@@ -75,8 +75,8 @@ export function generateRecurringInstances(
 
       case 'WEEKLY':
         if (recurrenceRule.byDay && recurrenceRule.byDay.length > 0) {
-          const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-          const currentDay = dayNames[currentDate.getDay()];
+          const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;
+          const currentDay = dayNames[currentDate.getDay()] as string;
           shouldInclude = recurrenceRule.byDay.includes(currentDay);
         } else {
           // Default: same day of week as start date
@@ -114,38 +114,42 @@ export function generateRecurringInstances(
       case 'WEEKLY':
         if (recurrenceRule.byDay && recurrenceRule.byDay.length > 0) {
           // For specific days, find next matching day
-          const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+          const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;
           const currentDayIndex = currentDate.getDay();
-          const currentDayName = dayNames[currentDayIndex];
+          const currentDayName = dayNames[currentDayIndex] as string;
           
           const currentDayInRule = recurrenceRule.byDay.indexOf(currentDayName);
           if (currentDayInRule !== -1 && currentDayInRule < recurrenceRule.byDay.length - 1) {
             // Next day in the rule (same week)
             const nextDayName = recurrenceRule.byDay[currentDayInRule + 1];
-            const nextDayIndex = dayNames.indexOf(nextDayName);
-            let daysUntilNext = nextDayIndex - currentDayIndex;
-            if (daysUntilNext <= 0) {
-              daysUntilNext += 7; // Wrap to next week
+            if (nextDayName) {
+              const nextDayIndex = dayNames.indexOf(nextDayName);
+              let daysUntilNext = nextDayIndex - currentDayIndex;
+              if (daysUntilNext <= 0) {
+                daysUntilNext += 7; // Wrap to next week
+              }
+              nextDate.setDate(nextDate.getDate() + daysUntilNext);
             }
-            nextDate.setDate(nextDate.getDate() + daysUntilNext);
           } else if (currentDayInRule === recurrenceRule.byDay.length - 1) {
             // Last day in rule, move to first day of next week
             const firstDayName = recurrenceRule.byDay[0];
-            const firstDayIndex = dayNames.indexOf(firstDayName);
-            let daysUntilNext = (firstDayIndex - currentDayIndex + 7) % 7;
-            if (daysUntilNext === 0) {
-              daysUntilNext = 7; // Move to next week
+            if (firstDayName) {
+              const firstDayIndex = dayNames.indexOf(firstDayName);
+              let daysUntilNext = (firstDayIndex - currentDayIndex + 7) % 7;
+              if (daysUntilNext === 0) {
+                daysUntilNext = 7; // Move to next week
+              }
+              nextDate.setDate(nextDate.getDate() + daysUntilNext);
             }
-            nextDate.setDate(nextDate.getDate() + daysUntilNext);
           } else {
             // Current day not in rule, find next matching day
-            const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+            const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'] as const;
             let found = false;
             for (let i = 1; i <= 7 && !found; i++) {
               const checkDate = new Date(currentDate);
               checkDate.setDate(checkDate.getDate() + i);
-              const checkDay = dayNames[checkDate.getDay()];
-              if (recurrenceRule.byDay.includes(checkDay)) {
+              const checkDay = dayNames[checkDate.getDay()] as string;
+              if (checkDay && recurrenceRule.byDay.includes(checkDay)) {
                 nextDate.setDate(currentDate.getDate() + i);
                 found = true;
               }
