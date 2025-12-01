@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Calendar, Clock, Target, Plus } from 'lucide-react';
+import { X, Calendar, Clock, Target, Plus, Repeat } from 'lucide-react';
 import type { CalendarEvent, Category } from '../../types';
 
 // Helper function to format date for datetime-local input (preserves local timezone)
@@ -42,6 +42,11 @@ const TaskForm: React.FC<TaskFormProps> = ({
 
   const [subtasks, setSubtasks] = useState<string[]>(['']);
   const [subcategories, setSubcategories] = useState<any[]>([]);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY'>('WEEKLY');
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [updateAllInstances, setUpdateAllInstances] = useState(false);
 
   // Initialize form data
   useEffect(() => {
@@ -58,6 +63,30 @@ const TaskForm: React.FC<TaskFormProps> = ({
       // Set subtasks from event or task
       const eventSubtasks = selectedEvent.subtasks || selectedEvent.task?.subtasks || [];
       setSubtasks(eventSubtasks.length > 0 ? eventSubtasks : ['']);
+      
+      // Set recurrence fields
+      setIsRecurring(!!selectedEvent.recurrenceRule || !!selectedEvent.parentEventId);
+      if (selectedEvent.recurrenceRule) {
+        const rule = selectedEvent.recurrenceRule;
+        if (rule.startsWith('WEEKLY')) {
+          setRecurrenceFrequency('WEEKLY');
+          const daysMatch = rule.match(/WEEKLY:(.+)/);
+          if (daysMatch) {
+            setSelectedDays(daysMatch[1].split(','));
+          }
+        } else if (rule.startsWith('DAILY')) {
+          setRecurrenceFrequency('DAILY');
+        } else if (rule.startsWith('MONTHLY')) {
+          setRecurrenceFrequency('MONTHLY');
+        }
+      }
+      if (selectedEvent.recurrenceEndDate) {
+        setRecurrenceEndDate(formatLocalDateTime(new Date(selectedEvent.recurrenceEndDate)));
+      }
+      // Show update option if it's a recurring instance
+      if (selectedEvent.isRecurringInstance || selectedEvent.parentEventId) {
+        setUpdateAllInstances(false);
+      }
     } else if (selectedSlot) {
       // Creating new event from calendar click
       setFormData({
@@ -83,6 +112,11 @@ const TaskForm: React.FC<TaskFormProps> = ({
         subcategoryId: ''
       });
       setSubtasks(['']);
+      setIsRecurring(false);
+      setRecurrenceFrequency('WEEKLY');
+      setRecurrenceEndDate('');
+      setSelectedDays([]);
+      setUpdateAllInstances(false);
     }
   }, [selectedEvent, selectedSlot]);
 
@@ -114,14 +148,31 @@ const TaskForm: React.FC<TaskFormProps> = ({
     // Filter out empty subtasks
     const validSubtasks = subtasks.filter(subtask => subtask.trim().length > 0);
 
-    const eventData = {
+    // Build recurrence rule
+    let recurrenceRule: string | null = null;
+    if (isRecurring) {
+      if (recurrenceFrequency === 'WEEKLY' && selectedDays.length > 0) {
+        recurrenceRule = `WEEKLY:${selectedDays.join(',')}`;
+      } else {
+        recurrenceRule = recurrenceFrequency;
+      }
+    }
+
+    const eventData: any = {
       taskId: null,
       title: formData.title.trim(),
       subtasks: validSubtasks.length > 0 ? validSubtasks : undefined,
       start: new Date(formData.start).toISOString(),
       end: new Date(formData.end).toISOString(),
-      isFocusSession: formData.isFocusSession
+      isFocusSession: formData.isFocusSession,
+      recurrenceRule: recurrenceRule,
+      recurrenceEndDate: recurrenceEndDate ? new Date(recurrenceEndDate).toISOString() : null
     };
+
+    // If editing and it's a recurring event, add updateAllInstances flag
+    if (selectedEvent && (selectedEvent.recurrenceRule || selectedEvent.parentEventId)) {
+      eventData.updateAllInstances = updateAllInstances;
+    }
 
     onSubmit(eventData);
   };
@@ -333,6 +384,139 @@ const TaskForm: React.FC<TaskFormProps> = ({
                     <p>This will be marked as a 90-minute focused work session. Perfect for deep work tasks like coding, writing, or research.</p>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Recurrence Toggle */}
+          <div className="flex items-center space-x-3">
+            <input
+              type="checkbox"
+              id="isRecurring"
+              checked={isRecurring}
+              onChange={(e) => setIsRecurring(e.target.checked)}
+              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+            />
+            <label htmlFor="isRecurring" className="text-sm font-medium text-gray-700">
+              <Repeat className="h-4 w-4 inline mr-1" />
+              Make this recurring
+            </label>
+          </div>
+
+          {/* Recurrence Options */}
+          {isRecurring && (
+            <div className="bg-gray-50 border border-gray-200 rounded-md p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Repeat Frequency
+                </label>
+                <select
+                  value={recurrenceFrequency}
+                  onChange={(e) => {
+                    setRecurrenceFrequency(e.target.value as 'DAILY' | 'WEEKLY' | 'MONTHLY');
+                    if (e.target.value !== 'WEEKLY') {
+                      setSelectedDays([]);
+                    }
+                  }}
+                  className="input w-full"
+                >
+                  <option value="DAILY">Daily</option>
+                  <option value="WEEKLY">Weekly</option>
+                  <option value="MONTHLY">Monthly</option>
+                </select>
+              </div>
+
+              {/* Weekly Day Selection */}
+              {recurrenceFrequency === 'WEEKLY' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Repeat on Days
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: 'MO', label: 'Mon' },
+                      { value: 'TU', label: 'Tue' },
+                      { value: 'WE', label: 'Wed' },
+                      { value: 'TH', label: 'Thu' },
+                      { value: 'FR', label: 'Fri' },
+                      { value: 'SA', label: 'Sat' },
+                      { value: 'SU', label: 'Sun' }
+                    ].map(day => (
+                      <button
+                        key={day.value}
+                        type="button"
+                        onClick={() => {
+                          if (selectedDays.includes(day.value)) {
+                            setSelectedDays(selectedDays.filter(d => d !== day.value));
+                          } else {
+                            setSelectedDays([...selectedDays, day.value]);
+                          }
+                        }}
+                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                          selectedDays.includes(day.value)
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {day.label}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedDays.length === 0 && (
+                    <p className="text-xs text-red-600 mt-1">Please select at least one day</p>
+                  )}
+                </div>
+              )}
+
+              {/* Recurrence End Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  End Date (Optional)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={recurrenceEndDate}
+                  onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                  className="input w-full"
+                  min={formData.start}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave empty to repeat indefinitely
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Update All Instances Option (when editing recurring event) */}
+          {selectedEvent && (selectedEvent.recurrenceRule || selectedEvent.parentEventId) && (
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <div className="flex items-start">
+                <input
+                  type="radio"
+                  id="thisInstance"
+                  name="updateScope"
+                  checked={!updateAllInstances}
+                  onChange={() => setUpdateAllInstances(false)}
+                  className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500"
+                />
+                <label htmlFor="thisInstance" className="ml-3 flex-1">
+                  <span className="text-sm font-medium text-gray-900">Update only this instance</span>
+                  <p className="text-xs text-gray-600 mt-1">Changes will only apply to this specific occurrence</p>
+                </label>
+              </div>
+              <div className="flex items-start mt-3">
+                <input
+                  type="radio"
+                  id="allInstances"
+                  name="updateScope"
+                  checked={updateAllInstances}
+                  onChange={() => setUpdateAllInstances(true)}
+                  className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500"
+                />
+                <label htmlFor="allInstances" className="ml-3 flex-1">
+                  <span className="text-sm font-medium text-gray-900">Update all future instances</span>
+                  <p className="text-xs text-gray-600 mt-1">Changes will apply to this and all future occurrences</p>
+                </label>
               </div>
             </div>
           )}

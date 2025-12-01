@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { createError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
+import { parseRecurrenceRule, generateRecurringEventDates, type RecurrenceRule } from '../utils/recurrence';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -14,14 +15,19 @@ const createEventSchema = z.object({
   subtasks: z.array(z.string()).optional(),
   start: z.string().datetime(),
   end: z.string().datetime(),
-  isFocusSession: z.boolean().optional()
+  isFocusSession: z.boolean().optional(),
+  recurrenceRule: z.string().optional().nullable(), // e.g., "DAILY", "WEEKLY", "WEEKLY:MO,WE,FR"
+  recurrenceEndDate: z.string().datetime().optional().nullable()
 });
 
 const updateEventSchema = z.object({
   start: z.string().datetime().optional(),
   end: z.string().datetime().optional(),
   isFocusSession: z.boolean().optional(),
-  taskId: z.string().optional().nullable()
+  taskId: z.string().optional().nullable(),
+  title: z.string().optional(),
+  subtasks: z.array(z.string()).optional(),
+  updateAllInstances: z.boolean().optional() // If true, update all future instances
 });
 
 // Get calendar events for a date range
@@ -36,15 +42,31 @@ router.get('/events', async (req: AuthRequest, res: Response, next: NextFunction
       });
     }
 
+    const startDate = new Date(start as string);
+    const endDate = new Date(end as string);
+
+    // Get all events (including parent recurring events and instances)
     const events = await prisma.calendarEvent.findMany({
       where: {
         userId: req.user!.id,
-        start: {
-          gte: new Date(start as string)
-        },
-        end: {
-          lte: new Date(end as string)
-        }
+        OR: [
+          // Events that start within the range
+          {
+            start: {
+              gte: startDate,
+              lte: endDate
+            }
+          },
+          // Parent recurring events that might generate instances in this range
+          {
+            recurrenceRule: { not: null },
+            start: { lte: endDate },
+            OR: [
+              { recurrenceEndDate: null },
+              { recurrenceEndDate: { gte: startDate } }
+            ]
+          }
+        ]
       },
       include: {
         task: {
@@ -52,20 +74,67 @@ router.get('/events', async (req: AuthRequest, res: Response, next: NextFunction
             category: true,
             subcategory: true
           }
-        }
+        },
+        parentEvent: true
       },
       orderBy: { start: 'asc' }
     });
 
-    // Parse subtasks JSON to array for each event
-    const eventsWithParsedSubtasks = events.map((event) => ({
-      ...event,
-      subtasks: event.subtasks ? JSON.parse(event.subtasks) : []
-    }));
+    // Generate recurring instances for parent events
+    const allEvents: any[] = [];
+    
+    for (const event of events) {
+      // If it's a recurring parent event, generate instances
+      if (event.recurrenceRule && !event.isRecurringInstance && !event.parentEventId) {
+        const recurrenceRule = parseRecurrenceRule(event.recurrenceRule);
+        if (recurrenceRule) {
+          // Set end date if provided
+          if (event.recurrenceEndDate) {
+            recurrenceRule.endDate = new Date(event.recurrenceEndDate);
+          }
+          
+          const instances = generateRecurringEventDates(
+            new Date(event.start),
+            new Date(event.end),
+            recurrenceRule,
+            200 // Max instances
+          );
+
+          // Filter instances that fall within the requested date range
+          const validInstances = instances.filter(instance => {
+            return instance.start >= startDate && instance.start <= endDate;
+          });
+
+          // Create event objects for each instance
+          for (const instance of validInstances) {
+            allEvents.push({
+              ...event,
+              id: `${event.id}_${instance.start.getTime()}`, // Unique ID for instance
+              start: instance.start,
+              end: instance.end,
+              isRecurringInstance: true,
+              parentEventId: event.id,
+              subtasks: event.subtasks ? JSON.parse(event.subtasks) : []
+            });
+          }
+        }
+      } else if (!event.isRecurringInstance) {
+        // Regular event or already an instance
+        allEvents.push({
+          ...event,
+          subtasks: event.subtasks ? JSON.parse(event.subtasks) : []
+        });
+      }
+    }
+
+    // Remove duplicates and sort
+    const uniqueEvents = Array.from(
+      new Map(allEvents.map(event => [event.id, event])).values()
+    ).sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 
     return res.json({
       success: true,
-      data: eventsWithParsedSubtasks
+      data: uniqueEvents
     });
   } catch (error) {
     return next(error);
@@ -124,7 +193,16 @@ router.post('/events', async (req: AuthRequest, res: Response, next: NextFunctio
     console.log('Received calendar event request:', req.body);
     console.log('User ID:', req.user?.id);
     
-    const { taskId, title, subtasks, start, end, isFocusSession = false } = createEventSchema.parse(req.body);
+    const { 
+      taskId, 
+      title, 
+      subtasks, 
+      start, 
+      end, 
+      isFocusSession = false,
+      recurrenceRule,
+      recurrenceEndDate
+    } = createEventSchema.parse(req.body);
 
     let task = null;
     let eventTitle = title;
@@ -162,9 +240,12 @@ router.post('/events', async (req: AuthRequest, res: Response, next: NextFunctio
       end: new Date(end),
       subtasks: subtasksJson,
       isFocusSession,
+      recurrenceRule,
+      recurrenceEndDate,
       userId: req.user!.id
     });
 
+    // Create the parent event (or single event if not recurring)
     const event = await prisma.calendarEvent.create({
       data: {
         taskId: taskId || null,
@@ -173,6 +254,8 @@ router.post('/events', async (req: AuthRequest, res: Response, next: NextFunctio
         end: new Date(end),
         subtasks: subtasksJson,
         isFocusSession,
+        recurrenceRule: recurrenceRule || null,
+        recurrenceEndDate: recurrenceEndDate ? new Date(recurrenceEndDate) : null,
         userId: req.user!.id
       },
       include: {
@@ -205,7 +288,7 @@ router.post('/events', async (req: AuthRequest, res: Response, next: NextFunctio
 // Update calendar event
 router.put('/events/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { start, end, isFocusSession, taskId } = updateEventSchema.parse(req.body);
+    const { start, end, isFocusSession, taskId, title, subtasks, updateAllInstances } = updateEventSchema.parse(req.body);
 
     if (!req.params.id) {
       return res.status(400).json({
@@ -213,6 +296,7 @@ router.put('/events/:id', async (req: AuthRequest, res: Response, next: NextFunc
         error: 'Event ID is required'
       });
     }
+    
     // Check if event exists and belongs to user
     const existingEvent = await prisma.calendarEvent.findFirst({
       where: { id: req.params.id, userId: req.user!.id }
@@ -222,6 +306,20 @@ router.put('/events/:id', async (req: AuthRequest, res: Response, next: NextFunc
       return res.status(404).json({
         success: false,
         error: 'Event not found'
+      });
+    }
+
+    // If this is a recurring instance and updateAllInstances is true, update the parent
+    const eventToUpdate = existingEvent.parentEventId && updateAllInstances
+      ? await prisma.calendarEvent.findFirst({
+          where: { id: existingEvent.parentEventId, userId: req.user!.id }
+        })
+      : existingEvent;
+
+    if (!eventToUpdate) {
+      return res.status(404).json({
+        success: false,
+        error: 'Parent event not found'
       });
     }
 
@@ -240,34 +338,66 @@ router.put('/events/:id', async (req: AuthRequest, res: Response, next: NextFunc
       }
     }
 
-    const event = await prisma.calendarEvent.update({
-      where: { id: req.params.id },
-      data: {
-        ...(start && { start: new Date(start) }),
-        ...(end && { end: new Date(end) }),
-        ...(isFocusSession !== undefined && { isFocusSession }),
-        ...(taskId !== undefined && { taskId: taskId || null })
-      },
-      include: {
-        task: {
-          include: {
-            category: true,
-            subcategory: true
-          }
-        }
-      }
-    });
-
-    // Parse subtasks JSON to array
-    const eventResponse = {
-      ...event,
-      subtasks: event.subtasks ? JSON.parse(event.subtasks) : []
+    // Prepare update data
+    const updateData: any = {
+      ...(start && { start: new Date(start) }),
+      ...(end && { end: new Date(end) }),
+      ...(isFocusSession !== undefined && { isFocusSession }),
+      ...(taskId !== undefined && { taskId: taskId || null }),
+      ...(title && { title }),
+      ...(subtasks && { subtasks: JSON.stringify(subtasks) })
     };
 
-    return res.json({
-      success: true,
-      data: eventResponse
-    });
+    // If updating all instances, update the parent event
+    if (updateAllInstances && eventToUpdate.recurrenceRule) {
+      const event = await prisma.calendarEvent.update({
+        where: { id: eventToUpdate.id },
+        data: updateData,
+        include: {
+          task: {
+            include: {
+              category: true,
+              subcategory: true
+            }
+          }
+        }
+      });
+
+      const eventResponse = {
+        ...event,
+        subtasks: event.subtasks ? JSON.parse(event.subtasks) : []
+      };
+
+      return res.json({
+        success: true,
+        data: eventResponse,
+        message: 'All future instances updated'
+      });
+    } else {
+      // Update single event (or create exception for recurring event)
+      const event = await prisma.calendarEvent.update({
+        where: { id: existingEvent.id },
+        data: updateData,
+        include: {
+          task: {
+            include: {
+              category: true,
+              subcategory: true
+            }
+          }
+        }
+      });
+
+      const eventResponse = {
+        ...event,
+        subtasks: event.subtasks ? JSON.parse(event.subtasks) : []
+      };
+
+      return res.json({
+        success: true,
+        data: eventResponse
+      });
+    }
   } catch (error) {
     return next(error);
   }
@@ -282,6 +412,10 @@ router.delete('/events/:id', async (req: AuthRequest, res: Response, next: NextF
         error: 'Event ID is required'
       });
     }
+
+    const { deleteAllInstances } = req.query;
+    const shouldDeleteAll = deleteAllInstances === 'true';
+
     const event = await prisma.calendarEvent.findFirst({
       where: { id: req.params.id, userId: req.user!.id }
     });
@@ -293,6 +427,48 @@ router.delete('/events/:id', async (req: AuthRequest, res: Response, next: NextF
       });
     }
 
+    // If deleting all instances of a recurring event, delete the parent
+    if (shouldDeleteAll && event.recurrenceRule && !event.parentEventId) {
+      // Delete parent and all child instances
+      await prisma.calendarEvent.deleteMany({
+        where: {
+          OR: [
+            { id: event.id },
+            { parentEventId: event.id }
+          ],
+          userId: req.user!.id
+        }
+      });
+
+      return res.json({
+        success: true,
+        message: 'All instances of recurring event deleted successfully'
+      });
+    } else if (event.parentEventId && shouldDeleteAll) {
+      // Delete parent and all instances
+      const parentEvent = await prisma.calendarEvent.findFirst({
+        where: { id: event.parentEventId, userId: req.user!.id }
+      });
+
+      if (parentEvent) {
+        await prisma.calendarEvent.deleteMany({
+          where: {
+            OR: [
+              { id: parentEvent.id },
+              { parentEventId: parentEvent.id }
+            ],
+            userId: req.user!.id
+          }
+        });
+
+        return res.json({
+          success: true,
+          message: 'All instances of recurring event deleted successfully'
+        });
+      }
+    }
+
+    // Delete single event
     await prisma.calendarEvent.delete({
       where: { id: req.params.id }
     });

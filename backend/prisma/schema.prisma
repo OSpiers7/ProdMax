@@ -97,20 +97,28 @@ model TimeSession {
 }
 
 model CalendarEvent {
-  id             String    @id @default(cuid())
-  taskId         String?
-  title          String
-  start          DateTime
-  end            DateTime
-  subtasks       String?   // JSON array of subtask strings (used when taskId is null)
-  isFocusSession Boolean   @default(false)
-  userId         String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  taskId          String?
+  title           String
+  start           DateTime
+  end             DateTime
+  subtasks        String?   // JSON array of subtask strings (used when taskId is null)
+  isFocusSession  Boolean   @default(false)
+  userId          String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Recurrence fields
+  recurrenceRule  String?   // e.g., "DAILY", "WEEKLY", "MONTHLY", or RRULE format
+  recurrenceEndDate DateTime? // End date for recurring series
+  parentEventId   String?   // For tracking original recurring event (self-reference)
+  isRecurringInstance Boolean @default(false) // True if this is a generated instance
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   task Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  parentEvent CalendarEvent? @relation("RecurringEventInstances", fields: [parentEventId], references: [id], onDelete: Cascade)
+  childEvents CalendarEvent[] @relation("RecurringEventInstances")
 
   @@map("calendar_events")
 }

@@ -105,6 +105,7 @@ const Calendar: React.FC = () => {
         queryClient.invalidateQueries('calendar-events');
         setShowTaskForm(false);
         setSelectedSlot(null);
+        setSelectedEvent(null);
       },
       onError: (error: any) => {
         console.error('Failed to create event:', error);
@@ -115,15 +116,40 @@ const Calendar: React.FC = () => {
     }
   );
 
-  // Delete calendar event mutation
-  const deleteEventMutation = useMutation(
-    async (eventId: string) => {
-      const response = await api.delete(`/calendar/events/${eventId}`);
+  // Update calendar event mutation
+  const updateEventMutation = useMutation(
+    async ({ eventId, eventData }: { eventId: string; eventData: any }) => {
+      console.log('Updating event:', eventId, eventData);
+      const response = await api.put(`/calendar/events/${eventId}`, eventData);
+      console.log('Event updated successfully:', response.data);
       return response.data;
     },
     {
       onSuccess: () => {
         queryClient.invalidateQueries('calendar-events');
+        setShowTaskForm(false);
+        setSelectedEvent(null);
+      },
+      onError: (error: any) => {
+        console.error('Failed to update event:', error);
+        alert(`Failed to update event: ${error.response?.data?.error || error.message}`);
+      }
+    }
+  );
+
+  // Delete calendar event mutation
+  const deleteEventMutation = useMutation(
+    async ({ eventId, deleteAllInstances = false }: { eventId: string; deleteAllInstances?: boolean }) => {
+      const url = deleteAllInstances 
+        ? `/calendar/events/${eventId}?deleteAllInstances=true`
+        : `/calendar/events/${eventId}`;
+      const response = await api.delete(url);
+      return response.data;
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('calendar-events');
+        setContextMenu(null);
       },
       onError: (error: any) => {
         console.error('Failed to delete event:', error);
@@ -250,8 +276,21 @@ const Calendar: React.FC = () => {
     setShowTaskForm(true);
   }, []);
 
-  const handleDeleteFromMenu = useCallback((eventId: string) => {
-    deleteEventMutation.mutate(eventId);
+  const handleDeleteFromMenu = useCallback((event: CalendarEvent) => {
+    const isRecurring = !!(event.recurrenceRule || event.parentEventId);
+    
+    if (isRecurring) {
+      const shouldDeleteAll = window.confirm(
+        'This is a recurring event. Do you want to delete all future instances, or just this one?\n\n' +
+        'Click OK to delete all instances, or Cancel to delete only this occurrence.'
+      );
+      deleteEventMutation.mutate({ 
+        eventId: event.parentEventId || event.id, 
+        deleteAllInstances: shouldDeleteAll 
+      });
+    } else {
+      deleteEventMutation.mutate({ eventId: event.id });
+    }
   }, [deleteEventMutation]);
 
   const handleChangeColorFromMenu = useCallback((event: CalendarEvent, categoryId: string) => {
@@ -278,6 +317,7 @@ const Calendar: React.FC = () => {
   const eventStyleGetter = (event: any) => {
     const backgroundColor = event.resource?.task?.category?.color || event.resource?.category?.color || '#3B82F6';
     const isFocusSession = event.resource?.isFocusSession;
+    const isRecurring = !!(event.resource?.recurrenceRule || event.resource?.parentEventId);
     
     return {
       style: {
@@ -285,7 +325,11 @@ const Calendar: React.FC = () => {
         borderRadius: '4px',
         opacity: 0.8,
         color: 'white',
-        border: isFocusSession ? '2px solid #F59E0B' : 'none',
+        border: isFocusSession 
+          ? '2px solid #F59E0B' 
+          : isRecurring 
+            ? '2px solid #10B981' 
+            : 'none',
         fontSize: '12px',
         fontWeight: '500'
       }
@@ -304,6 +348,9 @@ const Calendar: React.FC = () => {
       >
         <div className="flex-1 flex items-center px-1 py-0.5">
           <span className="text-xs font-medium truncate">{event.title}</span>
+          {(calendarEvent.recurrenceRule || calendarEvent.parentEventId) && (
+            <span className="ml-1 text-[10px] opacity-75" title="Recurring event">🔄</span>
+          )}
         </div>
         {showStartButton && (
           <div className="px-1 pb-0.5">
@@ -474,8 +521,17 @@ const Calendar: React.FC = () => {
           selectedSlot={selectedSlot}
           selectedEvent={selectedEvent}
           categories={categories}
-          onSubmit={createEventMutation.mutate}
-          isLoading={createEventMutation.isLoading}
+          onSubmit={(eventData: any) => {
+            if (selectedEvent) {
+              // Update existing event
+              const eventId = selectedEvent.parentEventId || selectedEvent.id;
+              updateEventMutation.mutate({ eventId, eventData });
+            } else {
+              // Create new event
+              createEventMutation.mutate(eventData);
+            }
+          }}
+          isLoading={createEventMutation.isLoading || updateEventMutation.isLoading}
         />
       )}
 

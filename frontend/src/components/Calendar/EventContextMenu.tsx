@@ -7,7 +7,7 @@ interface EventContextMenuProps {
   position: { x: number; y: number };
   onClose: () => void;
   onEdit: (event: CalendarEvent) => void;
-  onDelete: (eventId: string) => void;
+  onDelete: (event: CalendarEvent) => void;
   onChangeColor: (event: CalendarEvent, categoryId: string) => void;
   categories: Category[];
 }
@@ -57,10 +57,8 @@ const EventContextMenu: React.FC<EventContextMenuProps> = ({
   };
 
   const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete "${event.title}"?`)) {
-      onDelete(event.id);
-      onClose();
-    }
+    onDelete(event);
+    onClose();
   };
 
   const handleColorChange = (categoryId: string) => {

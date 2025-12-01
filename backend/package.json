@@ -11,7 +11,10 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:switch": "node switch-database.js auto",
+    "db:switch:local": "node switch-database.js local",
+    "db:switch:production": "node switch-database.js production"
   },
   "keywords": ["productivity", "api", "scheduling"],
   "author": "Oscar Spiers",

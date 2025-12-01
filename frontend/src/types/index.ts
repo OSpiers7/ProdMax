@@ -12,6 +12,10 @@ export interface CalendarEvent {
   isFocusSession: boolean;
   userId: string;
   task?: Task;
+  recurrenceRule?: string | null;
+  recurrenceEndDate?: Date | string | null;
+  parentEventId?: string | null;
+  isRecurringInstance?: boolean;
 }
 
 export interface Task {
@@ -48,6 +52,8 @@ export interface CreateEventRequest {
   start: string;
   end: string;
   isFocusSession?: boolean;
+  recurrenceRule?: string | null;
+  recurrenceEndDate?: string | null;
 }
 
 export interface UpdateEventRequest {
@@ -56,4 +62,5 @@ export interface UpdateEventRequest {
   start?: string;
   end?: string;
   isFocusSession?: boolean;
+  updateAllInstances?: boolean;
 }
