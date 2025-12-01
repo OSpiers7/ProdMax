@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "npm run db:switch:production && npx prisma generate && npx tsc",
+    "build:local": "npm run db:switch:local && prisma generate && tsc",
     "start": "node dist/index.js",
     "test": "jest",
     "db:generate": "prisma generate",

@@ -42,16 +42,50 @@ const Calendar: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch calendar events
+  // Calculate date range based on current view and date
+  const dateRange = useMemo(() => {
+    const currentDate = new Date(date);
+    let startDate: Date;
+    let endDate: Date;
+
+    if (view === Views.MONTH) {
+      // Month view: Get full month range
+      startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      endDate.setHours(23, 59, 59, 999);
+    } else if (view === Views.WEEK) {
+      // Week view: Get week range (Monday to Sunday)
+      const day = currentDate.getDay();
+      const diff = currentDate.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
+      startDate = new Date(currentDate.setDate(diff));
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      // Day view or other: Get single day
+      startDate = new Date(currentDate);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(currentDate);
+      endDate.setHours(23, 59, 59, 999);
+    }
+
+    // Extend range by 1 month before and after to catch recurring events
+    const extendedStart = new Date(startDate);
+    extendedStart.setMonth(extendedStart.getMonth() - 1);
+    const extendedEnd = new Date(endDate);
+    extendedEnd.setMonth(extendedEnd.getMonth() + 1);
+
+    return { start: extendedStart, end: extendedEnd, displayStart: startDate, displayEnd: endDate };
+  }, [date, view]);
+
+  // Fetch calendar events - query key includes date and view for proper refetching
   const { data: events = [], isLoading, error: eventsError } = useQuery<CalendarEvent[]>(
-    'calendar-events',
+    ['calendar-events', dateRange.start.toISOString(), dateRange.end.toISOString()],
     async () => {
-      // Get current month range for events
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
-      const response = await api.get(`/calendar/events?start=${startOfMonth.toISOString()}&end=${endOfMonth.toISOString()}`);
+      const response = await api.get(
+        `/calendar/events?start=${dateRange.start.toISOString()}&end=${dateRange.end.toISOString()}`
+      );
       return response.data.data;
     },
     {
@@ -297,16 +331,22 @@ const Calendar: React.FC = () => {
     updateEventCategoryMutation.mutate({ eventId: event.id, categoryId });
   }, [updateEventCategoryMutation]);
 
-  // Format events for React Big Calendar
+  // Format events for React Big Calendar and filter to visible range
   const formattedEvents = useMemo(() => {
-    return events.map(event => ({
-      ...event,
-      start: new Date(event.start),
-      end: new Date(event.end),
-      title: event.title,
-      resource: event
-    }));
-  }, [events]);
+    return events
+      .filter(event => {
+        const eventStart = new Date(event.start);
+        // Only show events that fall within the visible date range
+        return eventStart >= dateRange.displayStart && eventStart <= dateRange.displayEnd;
+      })
+      .map(event => ({
+        ...event,
+        start: new Date(event.start),
+        end: new Date(event.end),
+        title: event.title,
+        resource: event
+      }));
+  }, [events, dateRange]);
 
   // Set min and max times for calendar (6am to 10pm)
   // React Big Calendar uses only the time portion, so we can use any date
